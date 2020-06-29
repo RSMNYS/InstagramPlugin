@@ -27,6 +27,9 @@
 
 static NSString *InstagramId = @"com.burbn.instagram";
 
+#define IS_IOS13orHIGHER ([[[UIDevice currentDevice] systemVersion] floatValue] >= 13.0)
+
+
 @implementation CDVInstagramPlugin
 
 @synthesize toInstagram;
@@ -50,7 +53,6 @@ static NSString *InstagramId = @"com.burbn.instagram";
 
 - (void)share:(CDVInvokedUrlCommand*)command {
     self.callbackId = command.callbackId;
-    self.toInstagram = FALSE;
     NSString    *objectAtIndex0 = [command argumentAtIndex:0];
     NSString    *caption = [command argumentAtIndex:1];
     
@@ -61,19 +63,31 @@ static NSString *InstagramId = @"com.burbn.instagram";
         NSLog(@"open in instagram");
         
         NSData *imageObj = [[NSData alloc] initWithBase64EncodedString:objectAtIndex0 options:0];
+          
         NSString *tmpDir = NSTemporaryDirectory();
-        NSString *path = [tmpDir stringByAppendingPathComponent:@"instagram.igo"];
-        
+        NSString *path;
+        if (IS_IOS13orHIGHER) {
+            self.toInstagram = TRUE;
+            path = [tmpDir stringByAppendingPathComponent:@"instagram.ig"];
+        } else {
+            path = [tmpDir stringByAppendingPathComponent:@"instagram.igo"];
+        }
+
         [imageObj writeToFile:path atomically:true];
         
         self.interactionController = [UIDocumentInteractionController interactionControllerWithURL:[NSURL fileURLWithPath:path]];
-        self.interactionController .UTI = @"com.instagram.exclusivegram";
+        
+        if (IS_IOS13orHIGHER) {
+            self.interactionController .UTI = @"com.instagram.photo";
+        } else {
+            self.interactionController .UTI = @"com.instagram.exclusivegram";
+        }
+
         if (caption) {
             self.interactionController .annotation = @{@"InstagramCaption" : caption};
         }
-        self.interactionController .delegate = self;
+        self.interactionController.delegate = self;
         [self.interactionController presentOpenInMenuFromRect:CGRectZero inView:self.webView animated:YES];
-        
     } else {
         result = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageToErrorObject:1];
         [self.commandDelegate sendPluginResult:result callbackId: self.callbackId];
@@ -90,12 +104,12 @@ static NSString *InstagramId = @"com.burbn.instagram";
     if ([[UIApplication sharedApplication] canOpenURL:instagramURL]) {
         NSLog(@"open asset in instagram");
         
-		NSString *localIdentifierEscaped = [localIdentifier stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLHostAllowedCharacterSet]];
-		NSURL *instagramShareURL   = [NSURL URLWithString:[NSString stringWithFormat:@"instagram://library?LocalIdentifier=%@", localIdentifierEscaped]];
-		
-		[[UIApplication sharedApplication] openURL:instagramShareURL];
+        NSString *localIdentifierEscaped = [localIdentifier stringByAddingPercentEncodingWithAllowedCharacters:[NSCharacterSet URLHostAllowedCharacterSet]];
+        NSURL *instagramShareURL   = [NSURL URLWithString:[NSString stringWithFormat:@"instagram://library?LocalIdentifier=%@", localIdentifierEscaped]];
+        
+        [[UIApplication sharedApplication] openURL:instagramShareURL];
 
-		result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+        result = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
         [self.commandDelegate sendPluginResult:result callbackId: self.callbackId];
         
     } else {
@@ -105,7 +119,7 @@ static NSString *InstagramId = @"com.burbn.instagram";
 }
 
 - (void) documentInteractionController: (UIDocumentInteractionController *) controller willBeginSendingToApplication: (NSString *) application {
-    if ([application isEqualToString:InstagramId]) {
+    if ([application isEqualToString: InstagramId]) {
         self.toInstagram = TRUE;
     }
 }
